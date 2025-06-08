@@ -32,3 +32,21 @@ func GenerateJWT(userID uint, role string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
 	return token.SignedString([]byte(secret))
 }
+
+func ValidateJWT(tokenString string) (*Claims, error) {
+	secret := os.Getenv("JWT_SECRET")
+
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, jwt.ErrSignatureInvalid
+}
