@@ -1,52 +1,115 @@
 package services
 
 import (
-	"fmt"
-	"os"
-	"time"
+	"errors"
+	_ "errors"
 
-	"github.com/golang-jwt/jwt/v5"
+	entities "github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/entites"
+	"github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/ports/repositories"
+	"github.com/iamsamitdev/fiber-ecommerce-api/pkg/utils"
 )
 
-type Claims struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-	jwt.RegisteredClaims
+type AuthServiceImpl struct {
+	userRepo repositories.UserRepository
 }
 
-// สร้างฟังก์ชั่นสำหรับสร้าง JWT
-func GenerateJWT(userID uint, role string) (string, error) {
-	secret := os.Getenv("JWT_SECRET")
+func NewAuthServiceImpl(userRepo repositories.UserRepository) *AuthServiceImpl {
+	return &AuthServiceImpl{
+		userRepo: userRepo,
+	}
+}
 
-	claims := &Claims{
-		UserID: fmt.Sprintf("%d", userID),
-		Role:   role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "fier-ecommerce-api",
-			NotBefore: jwt.NewNumericDate(time.Now()),
-		},
+func (s *AuthServiceImpl) Register(req entities.RegisterRequest) (*entities.User, error) {
+	exitingUser, _ := s.userRepo.GetByEmail(req.Email)
+	if exitingUser != nil {
+		return nil, errors.New("User already exists")
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-	return token.SignedString([]byte(secret))
-}
-
-func ValidateJWT(tokenString string) (*Claims, error) {
-	secret := os.Getenv("JWT_SECRET")
-
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
-	})
-
+	hashPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
-		return claims, nil
+	user := &entities.User{
+		Email:     req.Email,
+		Password:  hashPassword,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Role:      entities.RoleUser,
+		IsActive:  true,
+	}
+	if err = s.userRepo.Create(user); err != nil {
+		return nil, err
+	}
+	return user, err
+}
+
+func (s *AuthServiceImpl) Login(req entities.LoginRequest) (*entities.LoginResponse, error) {
+	user, err := s.userRepo.GetByEmail(req.Email)
+	if err != nil {
+		return nil, errors.New("Invalid login is not found")
 	}
 
-	return nil, jwt.ErrSignatureInvalid
+	if user.IsActive {
+		return nil, errors.New("Account is deactive")
+	}
+
+	if !utils.CheckPassword(req.Password, user.Password) {
+		return nil, errors.New("Invalid email or password")
+	}
+
+	token, err := utils.GenerateJWT(user.ID, string(user.Role))
+	if err != nil {
+		return nil, errors.New("Failed to generate token")
+	}
+
+	return &entities.LoginResponse{
+		Token: token,
+		User:  *user,
+	}, nil
+
+}
+
+func (s *AuthServiceImpl) GetUserByID(id uint) (*entities.User, error) {
+	user, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *AuthServiceImpl) UpdateUser(req entities.User) (*entities.User, error) {
+	user, err := s.userRepo.GetByID(req.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.FirstName = req.FirstName
+	user.LastName = req.LastName
+	user.Email = req.Email
+
+	if err := s.userRepo.Update(user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *AuthServiceImpl) DeleteUser(id uint) error {
+	user, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	if err := s.userRepo.Delete(user.ID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *AuthServiceImpl) GetAllUsers() ([]entities.User, error) {
+	users, err := s.userRepo.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
 }
