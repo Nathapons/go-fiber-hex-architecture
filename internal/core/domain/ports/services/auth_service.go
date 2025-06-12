@@ -1,6 +1,6 @@
 package services
 
-import entities "github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/entites"
+import entities "github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/entities"
 
 type AuthService interface {
 	Register(request *entities.RegisterRequest) (*entities.LoginResponse, error)

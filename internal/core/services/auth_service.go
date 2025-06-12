@@ -4,7 +4,7 @@ import (
 	"errors"
 	_ "errors"
 
-	entities "github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/entites"
+	entities "github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/entities"
 	"github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/ports/repositories"
 	"github.com/iamsamitdev/fiber-ecommerce-api/pkg/utils"
 )

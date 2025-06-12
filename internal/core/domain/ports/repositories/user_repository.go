@@ -1,6 +1,6 @@
 package repositories
 
-import "github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/entites"
+import "github.com/iamsamitdev/fiber-ecommerce-api/internal/core/domain/entities"
 
 type UserRepository interface {
 	Create(user *entities.User) error
